@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仓储费计算器</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f3f5f8;
+  padding: 25px;
+}
+.container {
+  max-width: 560px;
+  margin: auto;
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 3px 15px #0001;
+}
+h2 { text-align: center; }
+label {
+  display: block;
+  margin-top: 15px;
+  font-weight: bold;
+}
+input, select {
+  width: 100%;
+  padding: 11px;
+  margin-top: 6px;
+  box-sizing: border-box;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 15px;
+}
+button {
+  width: 100%;
+  padding: 13px;
+  margin-top: 20px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+}
+button:hover { background: #1d4ed8; }
+.result {
+  margin-top: 22px;
+  padding: 18px;
+  background: #f0f5ff;
+  border-radius: 8px;
+  line-height: 2;
+}
+.total {
+  font-size: 25px;
+  color: #15803d;
+  font-weight: bold;
+}
+.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+<h2>仓储费计算器</h2>
+
+<label>货物类型</label>
+<select id="type" onchange="changeType()">
+  <option value="commercial">普通商业货</option>
+  <option value="ecom">电商货物</option>
+</select>
+
+<div id="volumeBox">
+<label>总体积（CBM）</label>
+<input type="number" id="volume" value="0.02" min="0" step="0.001">
+</div>
+
+<div id="qtyBox" class="hidden">
+<label>货物件数</label>
+<input type="number" id="qty" value="1" min="1" step="1">
+</div>
+
+<label>入库日期</label>
+<input type="date" id="arrival">
+
+<label>收费截止日期</label>
+<input type="date" id="cutoff">
+
+<button onclick="calculate()">计算仓储费</button>
+
+<div class="result" id="result">
+  等待计算...
+</div>
+</div>
+
+<script>
+function changeType() {
+  const type = document.getElementById("type").value;
+  document.getElementById("volumeBox").classList.toggle("hidden", type === "ecom");
+  document.getElementById("qtyBox").classList.toggle("hidden", type !== "ecom");
+}
+
+function calculate() {
+  const type = document.getElementById("type").value;
+  const arrival = document.getElementById("arrival").value;
+  const cutoff = document.getElementById("cutoff").value;
+
+  const output = document.getElementById("result");
+
+  if (!arrival || !cutoff) {
+    output.innerHTML = "请填写完整日期";
+    return;
+  }
+
+  // UTC计算，避免夏令时导致天数错误
+  const start = Date.parse(arrival + "T00:00:00Z");
+  const end = Date.parse(cutoff + "T00:00:00Z");
+
+  if (end < start) {
+    output.innerHTML = "截止日期不能早于入库日期";
+    return;
+  }
+
+  // 入库当天计为第1天
+  const days = Math.round((end - start) / 86400000) + 1;
+
+  let freeDays, firstDays, secondDays;
+  let fee1, fee2, total;
+
+  if (type === "commercial") {
+    const volume = Number(document.getElementById("volume").value);
+
+    if (!Number.isFinite(volume) || volume <= 0) {
+      output.innerHTML = "请输入有效的货物体积";
+      return;
+    }
+
+    freeDays = 15;
+    firstDays = Math.max(0, Math.min(days, 60) - 15);
+    secondDays = Math.max(0, days - 60);
+
+    fee1 = firstDays * 15 * volume;
+    fee2 = secondDays * 30 * volume;
+
+  } else {
+    const qty = Number(document.getElementById("qty").value);
+
+    if (!Number.isInteger(qty) || qty <= 0) {
+      output.innerHTML = "请输入有效件数";
+      return;
+    }
+
+    freeDays = 30;
+    firstDays = Math.max(0, Math.min(days, 90) - 30);
+    secondDays = Math.max(0, days - 90);
+
+    fee1 = firstDays * 1 * qty;
+    fee2 = secondDays * 2 * qty;
+  }
+
+  total = fee1 + fee2;
+
+  output.innerHTML = `
+    <b>计算结果</b><br>
+    入库日期：${arrival}<br>
+    截止日期：${cutoff}<br>
+    总存放天数：${days} 天<br>
+    免费天数：${freeDays} 天<br>
+    实际收费天数：${Math.max(0,days-freeDays)} 天<br>
+    第一阶段：${firstDays} 天，$${fee1.toFixed(2)} MXN<br>
+    第二阶段：${secondDays} 天，$${fee2.toFixed(2)} MXN<br>
+    <hr>
+    仓储费合计：
+    <div class="total">$${total.toFixed(2)} MXN</div>
+  `;
+}
+</script>
+
+</body>
+</html>
